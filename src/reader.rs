@@ -1,5 +1,4 @@
 use std::io::Read;
-use std::io::BufReader;
 
 const BUFFER_SIZE: usize = 4096;
 
@@ -18,7 +17,7 @@ pub struct RedshiftReader<R> {
 }
 
 impl<R: Read> RedshiftReader<R> {
-    pub fn new(mut reader: R) -> Self {
+    pub fn new(reader: R) -> Self {
         RedshiftReader {
             reader: reader,
             buffer: vec![0; BUFFER_SIZE].into_boxed_slice(),
