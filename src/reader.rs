@@ -2,50 +2,79 @@ use std::io::Read;
 
 const BUFFER_SIZE: usize = 4096;
 
+//TODO: make of trait error
+pub struct RedshiftParseError {
+    message: String
+}
+
 pub struct RedshiftRow {
 
     //TODO: remove public accessor
     pub values: Vec<String>
 }
 
-pub struct RedshiftReader<R> {
+pub struct Reader<R> {
     reader: R,
     buffer: Box<[u8]>,
     end_of_line: bool,
+    end_of_stream: bool,
     pos: usize,
     length: usize,
 }
 
-impl<R: Read> RedshiftReader<R> {
+enum NextItemResult {
+    EndOfLine,
+    EndOfStream,
+    Item(String),
+    Error(RedshiftParseError),
+}
+
+impl<R: Read> Iterator for Reader<R> {
+    type Item = RedshiftRow;
+
+    fn next(&mut self) -> Option<RedshiftRow> {
+        let next_row = self.get_next_row();
+        match next_row {
+            Ok(maybe_row) => maybe_row,
+            Err(e) => panic!(e.message),
+        }
+    }
+}
+
+impl<R: Read> Reader<R> {
+
     pub fn new(reader: R) -> Self {
-        RedshiftReader {
+        Reader {
             reader: reader,
             buffer: vec![0; BUFFER_SIZE].into_boxed_slice(),
             end_of_line: false,
+            end_of_stream: false,
             pos: 0,
             length: 0
         }
     }
 
-    pub fn get_next_row(&mut self) -> Option<RedshiftRow> {
+    pub fn get_next_row(&mut self) -> Result<Option<RedshiftRow>, RedshiftParseError> {
         let mut row: Vec<String> = Vec::new();
         loop {
-            if let Some(next_item) = self.get_next_item() {
-                row.push(next_item);
-            } else {
-                return if row.len() == 0 { None } else {
-                    Some(RedshiftRow { values: row })
-                };
+            match self.get_next_item() {
+                NextItemResult::Item(next_item) => row.push(next_item),
+                NextItemResult::EndOfLine => return Ok(Some(RedshiftRow { values: row })),
+                NextItemResult::EndOfStream => return if row.len() > 0 { Ok(Some(RedshiftRow { values: row })) } else { Ok(None) },
+                NextItemResult::Error(e) => return Err(e),
             }
         }
     }
 
-    fn get_next_item(&mut self) -> Option<String> {
+    fn get_next_item(&mut self) -> NextItemResult {
+        if self.end_of_stream {
+            return NextItemResult::EndOfStream;
+        }
         if self.end_of_line {
 
             // previous item was the last one on the row, start a new row
             self.end_of_line = false;
-            return None;
+            return NextItemResult::EndOfLine;
         }
         let mut found_quote = false;
         let mut found_closing_quote = false;
@@ -57,10 +86,10 @@ impl<R: Read> RedshiftReader<R> {
 
                         // end of an item was found
                         if !found_closing_quote && found_quote {
-                            //TODO: proper error
+                            return NextItemResult::Error(RedshiftParseError{ message: String::from("Did not find a closing quote") });
                         }
-                        return Some(next_item);
-                    }
+                        return NextItemResult::Item(next_item);
+                    },
                     ch @ '\n' | ch @ '\r' => {
                         self.end_of_line = true;
                         if ch == '\r' {
@@ -69,16 +98,17 @@ impl<R: Read> RedshiftReader<R> {
                                 self.get_next_char(true);
                             }
                         }
-                        return Some(next_item);
-                    }
+                        return NextItemResult::Item(next_item);
+                    },
                     ' ' => {
                         if next_item.len() == 0 {
                             continue;
                         } else {
                             next_item.push(c);
                         }
-                    }
+                    },
                     '"' => {
+                        //TODO: does this handle "" case?
                         if next_item.len() == 0 && !found_quote {
                             found_quote = true;
                             continue;
@@ -86,37 +116,40 @@ impl<R: Read> RedshiftReader<R> {
                             found_closing_quote = true;
                             continue;
                         } else {
-                            //TODO: error
+                            return NextItemResult::Error(RedshiftParseError {
+                                message: String::from("Found invalid quote that was not escaped")
+                            });
                         }
-                    }
+                    },
                     '\\' => {
 
                         // this is an escape sequence
                         let next_next = self.get_next_char(false);
                         if next_next.is_none() {
-                            //TODO: error!
+                            return NextItemResult::Error(RedshiftParseError {
+                                message: String::from("Found the beginning of an escape sequence, but no character followed")
+                            });
                         }
                         match next_next.unwrap() {
                             '\n' | '\r' | '|' | '\\' | '\'' | '"' => {
                                 next_item.push(self.get_next_char(true).unwrap());
                                 continue;
-                            }
-                            _ => {
-                                // TODO: error
+                            },
+                            unknown => {
+                                return NextItemResult::Error(RedshiftParseError {
+                                    message: String::from(format!("Unknown escape sequence \\{}", unknown))
+                                });
                             }
                         }
-                    }
-                    ch @ _ => {
+                    },
+                    ch => {
 
                         // this must be a regular character, add it!
                         next_item.push(ch);
                     }
                 }
             } else {
-
-
-                // we have reached the end of the stream, let's return what we have
-                return if next_item.len() > 0 { Some(next_item) } else { None }
+                return NextItemResult::Item(next_item)
             }
         }
     }
@@ -125,7 +158,7 @@ impl<R: Read> RedshiftReader<R> {
         if self.pos >= self.length {
             self.length = self.reader.read(&mut self.buffer).unwrap();
             if self.length == 0 {
-                self.end_of_line = true;
+                self.end_of_stream = true;
                 return None;
             }
         }
