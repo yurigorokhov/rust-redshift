@@ -52,8 +52,14 @@ impl<R: Read> Reader<R> {
         loop {
             match try!(self.get_next_item()) {
                 NextItemResult::Item(next_item) => row.push(next_item),
-                NextItemResult::EndOfLine => return Ok(Some(RedshiftRow { values: row })),
-                NextItemResult::EndOfStream => return if row.len() > 0 { Ok(Some(RedshiftRow { values: row })) } else { Ok(None) },
+                NextItemResult::EndOfLine => {
+                    if row.len() == 0 || (row.len() == 1 && row[0].len() == 0)  {
+                        continue;
+                    }
+                    return Ok(Some(RedshiftRow { values: row }))
+                },
+                NextItemResult::EndOfStream => {
+                    return if row.len() > 0 { Ok(Some(RedshiftRow { values: row })) } else { Ok(None) } },
             }
         }
     }
@@ -105,11 +111,9 @@ impl<R: Read> Reader<R> {
                         if next_item.len() == 0 && !found_quote {
                             found_quote = true;
                             continue;
-                        } else if next_item.len() > 0 && found_quote {
+                        } else if found_quote {
                             found_closing_quote = true;
                             continue;
-                        } else {
-                            return Err(From::from("Found invalid quote that was not escaped"));
                         }
                     },
                     '\\' => {
@@ -152,6 +156,7 @@ impl<R: Read> Reader<R> {
                 self.end_of_stream = true;
                 return Ok(None);
             }
+            self.pos = 0;
         }
         return Ok(Some(
             if eat {

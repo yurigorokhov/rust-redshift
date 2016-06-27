@@ -57,6 +57,23 @@ b"||\n||\n";
     }
 
     #[test]
+    fn can_parse_empty_values_with_double_quotes() {
+
+        // Arrange
+        let input_data =
+            b"\"\"|\"\"|\"\"\n\"\"|\"\"|\"\"\n";
+        let mut reader = BufReader::new(&input_data[..]);
+
+        // Act
+        let mut redshift_reader = redshift::reader::Reader::new(&mut reader);
+
+        // Assert
+        validate_row(redshift_reader.next().unwrap(), vec!["", "", ""]);
+        validate_row(redshift_reader.next().unwrap(), vec!["", "", ""]);
+        //assert!(redshift_reader.next().is_none());
+    }
+
+    #[test]
     fn can_parse_empty_values_with_no_trailing_newline() {
 
         // Arrange

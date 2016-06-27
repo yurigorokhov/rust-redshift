@@ -3,4 +3,13 @@ name = "redshift"
 version = "0.1.0"
 authors = ["Yuri Gorokhov <yurigorokhov@gmail.com>"]
 
+[lib]
+name = "redshift"
+path = "src/lib.rs"
+
+[[bin]]
+name = "redshift2csv"
+path = "src/bin.rs"
+
 [dependencies]
+csv = "0.14.4"
