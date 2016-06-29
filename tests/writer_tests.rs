@@ -3,10 +3,12 @@ mod test {
 
     extern crate redshift;
 
-    struct TestItem {
-        pub A: String,
-        pub B: String,
-        pub C: String,
+    use std::str;
+
+    struct TestItem<'a> {
+        pub A: &'a str,
+        pub B: &'a str,
+        pub C: &'a str,
     }
 
     #[test]
@@ -15,28 +17,32 @@ mod test {
         // Arrange
         let test_column_definitions = vec![
             redshift::writer::ColumnDefinition::<TestItem> {
-                name:  "Acolumn".to_string(),
-                extract_column: Box::new(move |i: &TestItem| i.A.clone()),
+                name:  "Acolumn",
+                extract_column: Box::new(move |i: &TestItem| i.A.to_string().clone()),
             },
             redshift::writer::ColumnDefinition::<TestItem> {
-                name: "Bcolumn".to_string(),
-                extract_column: Box::new(move |i: &TestItem| i.B.clone()),
+
+                name: "Bcolumn",
+                extract_column: Box::new(move |i: &TestItem| i.B.to_string().clone()),
             },
             redshift::writer::ColumnDefinition::<TestItem> {
-                name: "Ccolumn".to_string(),
-                extract_column: Box::new(move |i: &TestItem| i.C.clone()),
+                name: "Ccolumn",
+                extract_column: Box::new(move |i: &TestItem| i.C.to_string().clone()),
             },
         ];
         let items = vec![
-            TestItem { A: "a1".to_string(), B: "b1".to_string(), C: "c1".to_string() },
-            TestItem { A: "a2".to_string(), B: "b2".to_string(), C: "c2".to_string() },
-            TestItem { A: "a3".to_string(), B: "b3".to_string(), C: "c3".to_string() },
+            TestItem { A: "a1", B: "b1", C: "c1" },
+            TestItem { A: "a2", B: "b2", C: "c2" },
+            TestItem { A: "a3", B: "b3", C: "c3" },
         ];
 
         // Act
         let mut byte_vec: Vec<u8> = Vec::new();
-        redshift::writer::write_columns(byte_vec, test_column_definitions, items);
---
+        let res = redshift::writer::write_columns(&mut byte_vec, test_column_definitions, items);
+
         // Assert
+        assert!(res.is_ok());
+        let result_str = str::from_utf8(&byte_vec).unwrap();
+        assert_eq!("\"a1\"|\"b1\"|\"c1\"\n\"a2\"|\"b2\"|\"c2\"\n\"a3\"|\"b3\"|\"c3\"\n", result_str);
     }
 }

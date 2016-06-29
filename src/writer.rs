@@ -1,8 +1,8 @@
 use std::error::Error;
 use std::io::Write;
 
-pub struct ColumnDefinition<T> {
-    pub name: String,
+pub struct ColumnDefinition<'a, T> {
+    pub name: &'a str,
     pub extract_column: Box<(Fn (&T) -> String)>,
 }
 
@@ -12,7 +12,7 @@ pub fn write_columns<W: Write, T>(mut writer: W, column_definitions: Vec<ColumnD
     for item in &items {
 
         // for each column, extract the column value from the item
-        for i in 1..column_definitions.len() {
+        for i in 0..column_definitions.len() {
             let escaped = escape_column_value((column_definitions[i].extract_column)(item));
             try!(writer.write(escaped.as_bytes()));
             if i < column_definitions.len() - 1 {
@@ -36,4 +36,5 @@ fn escape_column_value(value: String) -> String {
         .replace("'", "\'")
         .replace("\"", "\\\"");
     return format!("\"{}\"", escaped);
+
 }
