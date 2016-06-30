@@ -3,10 +3,39 @@ use std::error::Error;
 
 const BUFFER_SIZE: usize = 4096;
 
+enum NextItemResult {
+    EndOfLine,
+    EndOfStream,
+    Item(String),
+}
+
+/// Represents a row of values
 pub struct RedshiftRow {
+
+    /// vector of column values
     pub values: Vec<String>
 }
 
+/// Reader for redshift files
+///
+/// # Examples
+/// ```
+/// extern crate csv;
+/// extern crate redshift;
+///
+/// use std::io;
+///
+/// // parse redshift file from stdin
+/// let redshift_reader = redshift::reader::Reader::new(io::stdin());
+///
+/// // create a writer to stdout
+/// let mut csv_writer = csv::Writer::from_writer(io::stdout());
+///
+/// // write out each record
+/// for row in redshift_reader {
+///    csv_writer.encode(row.values).unwrap();
+/// }
+/// ```
 pub struct Reader<R> {
     reader: R,
     buffer: Box<[u8]>,
@@ -14,12 +43,6 @@ pub struct Reader<R> {
     end_of_stream: bool,
     pos: usize,
     length: usize,
-}
-
-enum NextItemResult {
-    EndOfLine,
-    EndOfStream,
-    Item(String),
 }
 
 impl<R: Read> Iterator for Reader<R> {
@@ -36,6 +59,13 @@ impl<R: Read> Iterator for Reader<R> {
 
 impl<R: Read> Reader<R> {
 
+    /// Construct a new Reader<R: Read>
+    ///
+    /// # Examples
+    /// ```
+    /// use std::io;
+    /// let redshift_reader = redshift::reader::Reader::new(io::stdin());
+    /// ```
     pub fn new(reader: R) -> Self {
         Reader {
             reader: reader,
