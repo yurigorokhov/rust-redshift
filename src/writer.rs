@@ -56,8 +56,6 @@ impl Writer {
 }
 
 fn escape_column_value(value: String) -> String {
-
-    //TODO: is there a more efficient replaceAll?
     let escaped = value
         .replace("\\", "\\\\")
         .replace("|", "\\|")
@@ -66,5 +64,4 @@ fn escape_column_value(value: String) -> String {
         .replace("'", "\'")
         .replace("\"", "\\\"");
     return format!("\"{}\"", escaped);
-
 }
