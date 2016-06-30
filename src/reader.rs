@@ -84,12 +84,17 @@ impl<R: Read> Reader<R> {
                 NextItemResult::Item(next_item) => row.push(next_item),
                 NextItemResult::EndOfLine => {
                     if row.len() == 0 || (row.len() == 1 && row[0].len() == 0)  {
+                        row = Vec::new();
                         continue;
                     }
                     return Ok(Some(RedshiftRow { values: row }))
                 },
                 NextItemResult::EndOfStream => {
-                    return if row.len() > 0 { Ok(Some(RedshiftRow { values: row })) } else { Ok(None) } },
+                    if row.len() == 0 || (row.len() == 1 && row[0].len() == 0)  {
+                        return Ok(None);
+                    }
+                    return Ok(Some(RedshiftRow { values: row }))
+                },
             }
         }
     }
